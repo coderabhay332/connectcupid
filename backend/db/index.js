@@ -1,8 +1,8 @@
 import mongoose, { model, Schema } from "mongoose";
-import {MONGO_URI} from "./config.js"
-import { type } from "os";
+import dotenv from "dotenv";
+dotenv.config();
 
-mongoose.connect(MONGO_URI)
+mongoose.connect(process.env.MONGO_URI)
     .then(() => {
         console.log("Connected to MongoDB");
     })

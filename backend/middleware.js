@@ -1,12 +1,12 @@
 import jwt from "jsonwebtoken";
-import { JWT_PASSWORD } from "./db/config.js";
-
+import dotenv from "dotenv";
+dotenv.config();
 export default function middleware(req, res, next) {
     try {
       const token = req.header("Authorization");
       if (!token) return res.status(403).send("Access denied.");
   
-      const decoded = jwt.verify(token, JWT_PASSWORD);
+      const decoded = jwt.verify(token, process.env.JWT_PASSWORD);
       req.user = decoded;
       next();
     } catch (error) {

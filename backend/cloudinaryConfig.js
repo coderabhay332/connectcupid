@@ -16,7 +16,6 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: (req, file) => {
-      // Get userId from middleware-injected user object
       const userId = req.user?.id || 'temp';
       return `users/${userId}`;
     },
@@ -25,7 +24,6 @@ const storage = new CloudinaryStorage({
   }
 });
 
-// Create multer upload middleware
 const uploadMiddleware = multer({ 
   storage,
   limits: {

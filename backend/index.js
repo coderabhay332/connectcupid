@@ -1,22 +1,112 @@
 // app.js
 import express from "express";
-import { User, Profile } from "./db/index.js";
+import { User, Profile, Tag, UserTag, UserQuestion, Question } from "./db/index.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 import middleware from "./middleware.js";
 import { upload, uploadUserImage, uploadMultipleImages } from "./cloudinaryConfig.js";
 const app = express();
 
-// Middleware
+
 app.use(express.json());
 dotenv.config();
-// Image upload routes
+
+app.get("/tags", async (req, res) => { 
+  try {
+    const tags = await Tag.find();
+    const tagNames = tags.map(tag => tag.name);
+    res.json(tagNames);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+})
+
+
+app.post("/tags", middleware, async (req, res) => {
+  const userId = req.user.id;
+  const { tags } = req.body;
+  console.log(tags);
+
+  if (!tags || !Array.isArray(tags)) {
+    return res.status(400).json({ message: "Tags are required and must be an array." });
+  }
+  if (!userId) {
+    return res.status(400).json({ message: "User is required." });
+  }
+
+  try {
+    const allTagIds = [];
+    for (const element of tags) {
+      const existingTag = await Tag.findOne({ name: element });
+      if (existingTag) {
+       
+        allTagIds.push(existingTag._id);
+      } else {
+        return res.status(400).json({ message: `${element} tag does not exist.` });
+      }
+    }
+    
+    await UserTag.create({ userId, interests: allTagIds });
+    return res.status(201).json({ message: "User tags created successfully." });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+app.post("/questions", middleware, async (req, res) => {
+  const userId = req.user.id;
+  const { response } = req.body; // Expecting an array of { question, answer }
+
+  if (!response || !Array.isArray(response)) {
+    return res
+      .status(400)
+      .json({ message: "Response must be an array of question/answer objects." });
+  }
+
+  try {
+    const answers = [];
+    for (const element of response) {
+      let questionId;
+      if (mongoose.isValidObjectId(element.question)) {
+        questionId = element.question;
+      } else {
+        const questionDoc = await Question.findOne({ name: element.question });
+        if (!questionDoc) {
+          return res
+            .status(400)
+            .json({ message: `Question "${element.question}" does not exist.` });
+        }
+        questionId = questionDoc._id;
+      }
+      answers.push({
+        question: questionId,
+        answer: element.answer,
+      });
+    }
+
+    // Create one UserQuestion document containing all answers
+    const userQuestions = await UserQuestion.create({ userId, answers });
+    return res.status(201).json({
+      message: "User questions created successfully",
+      userQuestions,
+    });
+  } catch (error) {
+    console.error("Error creating user questions:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
 app.post('/upload', middleware, upload.single('image'), uploadUserImage);
 app.post('/upload-multiple', middleware, upload.array('images', 5), uploadMultipleImages);
 
 // Auth routes
 
+app.get("/", (req, res) => {
+  res.send("Welcome to the dating app API");
+
+})
 
 
 app.post("/signin", async (req, res) => {
@@ -74,9 +164,9 @@ app.post("/signup", async (req, res) => {
 });
 
 app.post("/profile", middleware, async (req, res) => {
-  const { age, height, phoneNo, location } = req.body;
+  const { age, height, phoneNo, location, name, gender } = req.body;
 
-  if (!age || !height || !phoneNo || !location) {
+  if (!age || !height || !phoneNo || !location, !gender, !name) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -87,6 +177,8 @@ app.post("/profile", middleware, async (req, res) => {
     }
 
     const profile = await Profile.create({
+      name,
+      gender,
       age,
       height,
       phoneNo,
